@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { TeamLogo } from '@/components/team-logo';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
+import crypto from 'crypto';
 
 export default async function SuperAdminDashboard() {
   const user = await currentUser();
@@ -23,6 +24,21 @@ export default async function SuperAdminDashboard() {
     dbUser = await db.query.users.findFirst({
       where: eq(users.clerkId, user.id),
     });
+
+    // Failsafe: Si el usuario no está en la base de datos (p.ej. falló el webhook) 
+    // pero su correo es el ADMIN_EMAIL oficial, lo creamos forzosamente como super_admin.
+    if (!dbUser && user.emailAddresses[0]?.emailAddress === process.env.ADMIN_EMAIL) {
+      const newUser = {
+        id: crypto.randomUUID(),
+        clerkId: user.id,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Super Admin',
+        email: user.emailAddresses[0].emailAddress,
+        avatarUrl: user.imageUrl,
+        role: 'super_admin' as const,
+      };
+      await db.insert(users).values(newUser);
+      dbUser = newUser;
+    }
   } catch (error) {
     console.error("Database connection or schema error:", error);
     return (
