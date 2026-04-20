@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { pools, matches, teams, participants, predictions, poolMatches } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { MatchCard } from "@/components/match-card";
 import { RankingTable } from "@/components/ranking-table";
@@ -26,32 +26,24 @@ export default async function PoolPage({ params, searchParams }: PoolPageProps) 
     notFound();
   }
 
-  // 2. Fetch Matches for this pool with team info
-  const assignedMatches = await db.select({
-    match: matches,
-    homeTeam: teams,
-    awayTeam: teams,
-  })
-  .from(poolMatches)
-  .where(eq(poolMatches.poolId, poolId))
-  .innerJoin(matches, eq(poolMatches.matchId, matches.id))
-  .innerJoin(teams, eq(matches.homeTeamId, teams.id))
-  .leftJoin(teams, eq(matches.awayTeamId, teams.id)) // This is a bit tricky with Drizzle aliases, let's do it cleaner
-  .orderBy(matches.matchDate);
-  
-  // Refined join because double-joining the same table needs aliases in Drizzle
-  // Let's fetch teams separately or use a more robust query
+  // 2. Fetch assigned matches (simple join, no duplicate table issue)
+  const assignedMatches = await db.select()
+    .from(poolMatches)
+    .where(eq(poolMatches.poolId, poolId))
+    .innerJoin(matches, eq(poolMatches.matchId, matches.id))
+    .orderBy(matches.matchDate);
+
+  // Load all teams into a map for efficient lookup
   const teamList = await db.select().from(teams);
   const teamMap = new Map(teamList.map(t => [t.id, t]));
 
-  // 3. Fetch Ranking
+  // 3. Fetch Ranking — ordered DESC (highest points first)
   const participantList = await db.select()
     .from(participants)
     .where(eq(participants.poolId, poolId))
-    .orderBy(participants.totalPoints);
+    .orderBy(desc(participants.totalPoints));
 
-  // 4. Fetch User Predictions if name is provided (e.g. from a search param or we can handle it client-side)
-  // For simplicity, we'll pass the participant info if we find it
+  // 4. Fetch User Predictions if name is provided
   let userParticipant = null;
   let userPredictions: any[] = [];
 
@@ -98,8 +90,7 @@ export default async function PoolPage({ params, searchParams }: PoolPageProps) 
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {assignedMatches.map((data: any) => {
-                const match = data.matches;
+              {assignedMatches.map(({ matches: match }) => {
                 const hTeam = teamMap.get(match.homeTeamId)!;
                 const aTeam = teamMap.get(match.awayTeamId)!;
                 const prediction = userPredictions.find((p: any) => p.matchId === match.id);
@@ -115,6 +106,11 @@ export default async function PoolPage({ params, searchParams }: PoolPageProps) 
                   />
                 );
               })}
+              {assignedMatches.length === 0 && (
+                <div className="col-span-2 text-center py-16 rounded-xl border-2 border-dashed border-zinc-800 text-zinc-500 italic">
+                  No hay partidos asignados a este grupo todavía.
+                </div>
+              )}
             </div>
           </div>
 

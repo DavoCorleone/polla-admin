@@ -1,7 +1,7 @@
 import { currentUser } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { users, pools, matches, teams, poolMatches, participants } from '@/lib/db/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, notInArray, sql } from 'drizzle-orm';
 import { notFound, redirect } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,37 +44,27 @@ export default async function PoolAdminDashboard({ params }: PoolAdminPageProps)
     redirect('/admin');
   }
 
-  // 2. Fetch Data
-  const assignedMatchesData = await db.select({
-    match: matches,
-    homeTeam: teams,
-    awayTeam: teams,
-  })
-  .from(poolMatches)
-  .where(eq(poolMatches.poolId, poolId))
-  .innerJoin(matches, eq(poolMatches.matchId, matches.id))
-  .innerJoin(teams, eq(matches.homeTeamId, teams.id))
-  // Alias for second join not straightforward here without proper drizzle alias, using map approach again
-  
-  const teamList = await db.select().from(teams);
-  const teamMap = new Map(teamList.map(t => [t.id, t]));
-
+  // 2. Fetch assigned matches (simple, correct join)
   const assignedMatches = await db.select()
     .from(poolMatches)
     .where(eq(poolMatches.poolId, poolId))
     .innerJoin(matches, eq(poolMatches.matchId, matches.id));
 
-  const participantCount = await db.select({ count: sql<number>`count(*)` })
+  // Load all teams into a map for efficient lookup
+  const teamList = await db.select().from(teams);
+  const teamMap = new Map(teamList.map(t => [t.id, t]));
+
+  // Participant count — cast to number properly
+  const participantCountRows = await db.select({ count: sql<string>`count(*)` })
     .from(participants)
     .where(eq(participants.poolId, poolId));
+  const participantCount = parseInt(participantCountRows[0]?.count ?? '0', 10);
 
-  // Fetch global matches NOT in this pool for adding
+  // Fetch global matches NOT already in this pool
   const assignedMatchIds = assignedMatches.map(m => m.matches.id);
-  const availableMatches = assignedMatchIds.length > 0 
-    ? await db.query.matches.findMany({
-        where: sql`${matches.id} NOT IN (${assignedMatchIds})`
-      })
-    : await db.query.matches.findMany();
+  const availableMatches = assignedMatchIds.length > 0
+    ? await db.select().from(matches).where(notInArray(matches.id, assignedMatchIds))
+    : await db.select().from(matches);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-50 flex flex-col">
@@ -115,7 +105,7 @@ export default async function PoolAdminDashboard({ params }: PoolAdminPageProps)
             <Card className="bg-zinc-900 border-zinc-800">
               <CardHeader className="pb-2">
                 <CardDescription className="uppercase text-[10px] font-bold tracking-widest">Participantes</CardDescription>
-                <CardTitle className="text-4xl font-black">{participantCount[0].count}</CardTitle>
+                <CardTitle className="text-4xl font-black">{participantCount}</CardTitle>
               </CardHeader>
             </Card>
             <Card className="bg-zinc-900 border-zinc-800">
@@ -171,7 +161,7 @@ export default async function PoolAdminDashboard({ params }: PoolAdminPageProps)
               </div>
             </div>
 
-            {/* Available Matches */}
+            {/* Available Matches to Add */}
             <div className="space-y-4">
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <Plus className="w-5 h-5 text-amber-500" />
@@ -187,7 +177,7 @@ export default async function PoolAdminDashboard({ params }: PoolAdminPageProps)
                       <div key={match.id} className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-between gap-3">
                         <div className="flex-1 flex items-center gap-2 overflow-hidden">
                           <span className="text-[10px] font-black text-zinc-400 truncate">
-                            {hTeam?.name} vs {aTeam?.name}
+                            {hTeam?.name ?? '?'} vs {aTeam?.name ?? '?'}
                           </span>
                         </div>
                         <form action={async () => {
