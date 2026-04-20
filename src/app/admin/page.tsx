@@ -18,9 +18,27 @@ export default async function SuperAdminDashboard() {
   }
 
   // Fetch user role from DB
-  const dbUser = await db.query.users.findFirst({
-    where: eq(users.clerkId, user.id),
-  });
+  let dbUser = null;
+  try {
+    dbUser = await db.query.users.findFirst({
+      where: eq(users.clerkId, user.id),
+    });
+  } catch (error) {
+    console.error("Database connection or schema error:", error);
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-8 text-center bg-zinc-950 text-zinc-50">
+        <Database className="w-16 h-16 text-rose-500 mb-6 mx-auto" />
+        <h1 className="text-3xl font-bold text-rose-500 mb-2">Error de Base de Datos</h1>
+        <p className="text-zinc-400 max-w-lg mb-6">
+          Parece que la base de datos de Neon no está conectada o las tablas aún no se han creado. 
+        </p>
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 max-w-xl w-full text-left font-mono text-sm space-y-4">
+          <p className="text-zinc-300"><strong>Paso 1:</strong> Configura <span className="text-emerald-400">DATABASE_URL</span> en Vercel y localmente.</p>
+          <p className="text-zinc-300"><strong>Paso 2:</strong> Ejecuta <span className="text-emerald-400">npx drizzle-kit push</span> en tu terminal para crear las tablas.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!dbUser || dbUser.role !== 'super_admin') {
     return (
