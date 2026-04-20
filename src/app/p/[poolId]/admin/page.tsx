@@ -142,14 +142,27 @@ export default async function PoolAdminDashboard({ params }: PoolAdminPageProps)
                         </div>
                       </div>
 
-                      <form action={async () => {
-                        'use server';
-                        await removeMatchFromPool(poolId, match.id);
-                      }}>
-                        <Button type="submit" variant="ghost" size="sm" className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </form>
+                      <div className="flex items-center gap-2">
+                        {match.status === 'FT' && (
+                          <form action={async () => {
+                            'use server';
+                            const { scoreMatchPredictions } = await import('@/lib/actions/scoring');
+                            await scoreMatchPredictions(match.id);
+                          }}>
+                            <Button type="submit" variant="ghost" size="sm" className="text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors">
+                              Topar Puntos
+                            </Button>
+                          </form>
+                        )}
+                        <form action={async () => {
+                          'use server';
+                          await removeMatchFromPool(poolId, match.id);
+                        }}>
+                          <Button type="submit" variant="ghost" size="sm" className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </form>
+                      </div>
                     </div>
                   );
                 })}
