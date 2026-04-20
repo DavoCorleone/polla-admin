@@ -1,22 +1,22 @@
-'use client';
-
 import Link from "next/link";
-import { Search, Trophy, ArrowRight } from "lucide-react";
+import { Search, Trophy, ArrowRight, Users } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { db } from "@/lib/db";
+import { pools } from "@/lib/db/schema";
+import { desc } from "drizzle-orm";
+import { TeamLogo } from "@/components/team-logo";
 
-export default function Home() {
-  const [poolCode, setPoolCode] = useState('');
-  const router = useRouter();
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (poolCode.trim()) {
-      router.push(`/p/${poolCode.trim()}`);
-    }
-  };
+export default async function Home() {
+  let availablePools: any[] = [];
+  
+  try {
+    availablePools = await db.query.pools.findMany({
+      orderBy: [desc(pools.createdAt)],
+    });
+  } catch (error) {
+    console.error("Error fetching pools, DB might not be configured:", error);
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-zinc-950 text-zinc-50 font-sans selection:bg-emerald-500/30">
@@ -37,14 +37,14 @@ export default function Home() {
         </nav>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center relative overflow-hidden">
+      <main className="flex-1 flex flex-col items-center justify-center relative overflow-hidden py-12">
         {/* Background Decor */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full pointer-events-none">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-500/10 rounded-full blur-[120px] opacity-20" />
           <div className="absolute top-1/4 left-1/3 w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-[100px] opacity-10" />
         </div>
 
-        <section className="w-full max-w-4xl px-6 py-20 relative z-10">
+        <section className="w-full max-w-4xl px-6 relative z-10">
           <div className="flex flex-col items-center space-y-10 text-center">
             <div className="space-y-6">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-[10px] font-bold text-emerald-500 uppercase tracking-[0.2em] animate-in fade-in slide-in-from-bottom-4 duration-1000">
@@ -54,32 +54,46 @@ export default function Home() {
                 PRONOSTICA.<br />COMPITE. GANA.
               </h1>
               <p className="mx-auto max-w-[600px] text-zinc-400 text-lg sm:text-xl font-medium animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-200">
-                Únete a un grupo, introduce tu marcador y demuestra que eres el que más sabe de fútbol.
+                Selecciona un grupo para unirte, introduce tu marcador y demuestra que eres el que más sabe de fútbol.
               </p>
             </div>
             
-            <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-16 duration-1000 delay-300">
-              <Card className="bg-zinc-900/40 border-zinc-800 backdrop-blur-2xl shadow-2xl shadow-black/50">
-                <CardHeader className="text-center">
-                  <CardTitle className="text-xl font-black">Entrar a una Polla</CardTitle>
-                  <CardDescription>Ingresa el ID de tu grupo para participar</CardDescription>
+            <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-16 duration-1000 delay-300">
+              <Card className="bg-zinc-900/40 border-zinc-800 backdrop-blur-2xl shadow-2xl shadow-black/50 text-left">
+                <CardHeader className="border-b border-zinc-800/50">
+                  <CardTitle className="text-xl font-black">Grupos Disponibles</CardTitle>
+                  <CardDescription>Escoge a qué grupo unirte para jugar</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSearch} className="flex flex-col gap-4">
-                    <div className="relative">
-                      <input 
-                        className="flex h-12 w-full rounded-xl border border-zinc-800 bg-zinc-950/50 px-4 py-2 text-sm ring-offset-zinc-950 placeholder:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 transition-all font-bold"
-                        placeholder="Ej: mundial-2026" 
-                        value={poolCode}
-                        onChange={(e) => setPoolCode(e.target.value)}
-                      />
-                      <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
-                    </div>
-                    <Button type="submit" className="h-12 rounded-xl bg-zinc-100 text-zinc-950 hover:bg-white font-black uppercase tracking-widest text-xs gap-2 group">
-                      Buscar Grupo
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                    </Button>
-                  </form>
+                <CardContent className="p-0">
+                  <div className="max-h-[400px] overflow-auto flex flex-col">
+                    {availablePools.length > 0 ? (
+                      availablePools.map((pool) => (
+                        <Link 
+                          key={pool.id} 
+                          href={`/p/${pool.id}`}
+                          className="flex items-center justify-between p-4 border-b border-zinc-800/50 hover:bg-zinc-800/50 transition-colors group"
+                        >
+                          <div className="flex items-center gap-4">
+                            <TeamLogo src={pool.logoUrl} name={pool.name} size={48} />
+                            <div>
+                              <h3 className="font-bold text-lg">{pool.name}</h3>
+                              <p className="text-xs text-zinc-500 flex items-center gap-1">
+                                <Users className="w-3 h-3" /> ID: {pool.id}
+                              </p>
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="sm" className="group-hover:bg-zinc-700/50 group-hover:text-white text-zinc-400 transition-colors gap-2">
+                            Entrar
+                            <ArrowRight className="w-4 h-4" />
+                          </Button>
+                        </Link>
+                      ))
+                    ) : (
+                      <div className="p-8 text-center text-zinc-500 italic">
+                        {availablePools === undefined ? "Cargando grupos..." : "No hay grupos creados todavía o la base de datos no está configurada."}
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -88,11 +102,22 @@ export default function Home() {
       </main>
       
       <footer className="py-10 w-full border-t border-zinc-800/30">
-        <div className="container mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">© 2026 Admin Polla Mundialista</p>
+        <div className="container mx-auto px-6 flex flex-col items-center justify-center gap-4 text-center">
+          <p className="text-xs font-medium text-zinc-400">
+            Desarrollado por{' '}
+            <a 
+              href="https://www.linkedin.com/in/david-chavez" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-emerald-500 hover:text-emerald-400 font-bold transition-colors underline decoration-emerald-500/30 underline-offset-4"
+            >
+              David Chavez
+            </a>
+          </p>
           <div className="flex gap-4">
-            <Link href="/privacy" className="text-[10px] font-bold text-zinc-600 hover:text-zinc-400 transition-colors uppercase tracking-widest">Privacidad</Link>
-            <Link href="/terms" className="text-[10px] font-bold text-zinc-600 hover:text-zinc-400 transition-colors uppercase tracking-widest">Términos</Link>
+            {/* Los links de privacidad y términos están deshabilitados hasta que existan páginas reales */}
+            <span className="text-[10px] font-bold text-zinc-700 uppercase tracking-widest cursor-not-allowed">Privacidad</span>
+            <span className="text-[10px] font-bold text-zinc-700 uppercase tracking-widest cursor-not-allowed">Términos</span>
           </div>
         </div>
       </footer>
