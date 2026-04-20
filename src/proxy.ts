@@ -1,7 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// Protegemos todas las rutas que comiencen con /admin o /admin-login (excepto la misma vista de login)
-const isAdminRoute = createRouteMatcher(['/admin(.*)']);
+// Protegemos las rutas administrativas, excluyendo explícitamente /admin-login
+const isAdminRoute = createRouteMatcher(['/admin', '/admin/(.*)']);
 
 export const proxy = clerkMiddleware(async (auth, req) => {
   if (isAdminRoute(req)) {
