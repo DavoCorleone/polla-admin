@@ -11,6 +11,7 @@ import { TeamLogo } from '@/components/team-logo';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 import crypto from 'crypto';
+import CreatePoolForm from './pools/CreatePoolForm';
 
 export default async function SuperAdminDashboard() {
   const user = await currentUser();
@@ -109,9 +110,7 @@ export default async function SuperAdminDashboard() {
               <h1 className="text-4xl font-black tracking-tight">Panel Super Admin</h1>
               <p className="text-zinc-500 mt-1">Gestiona todas las pollas y partidos globales del sistema.</p>
             </div>
-            <Button className="font-bold">
-              <Plus className="w-4 h-4 mr-2" /> Crear Nueva Polla
-            </Button>
+            <CreatePoolForm ownerId={dbUser.id} />
           </div>
 
           {/* Stats Grid */}
